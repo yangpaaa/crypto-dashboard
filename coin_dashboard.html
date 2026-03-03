@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Crypto Dashboard</title>
+  <style>
+    :root{
+      --bg:#0b0f17;
+      --card:#121a2a;
+      --line:rgba(255,255,255,.08);
+      --txt:#e9eefc;
+      --mut:#a9b2c7;
+      --good:#15c47e;
+      --bad:#ff4d5a;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
+      --focus: rgba(255,255,255,.14);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
+      background: radial-gradient(1200px 700px at 20% 0%, #172342 0%, var(--bg) 60%);
+      color:var(--txt);
+    }
+    .wrap{max-width:1280px; margin:0 auto; padding:16px;}
+    .top{
+      display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+    .title{font-weight:900; letter-spacing:.2px; font-size:18px}
+    .meta{color:var(--mut); font-size:12px}
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+    .pill{
+      padding:6px 10px; border:1px solid var(--line);
+      border-radius:999px; font-size:12px; color:var(--mut);
+      background: rgba(255,255,255,.02);
+    }
+    .grid{
+      display:grid; gap:12px;
+      grid-template-columns: 1.15fr .85fr;
+    }
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card h3{
+      margin:0; padding:12px 14px; font-size:13px; color:var(--mut);
+      border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .card .body{padding:14px}
+    .small{font-size:12px; color:var(--mut)}
+
+    .btn{
+      appearance:none; border:1px solid var(--line); background: rgba(255,255,255,.02);
+      color:var(--txt); padding:10px 12px; border-radius:12px; cursor:pointer;
+      transition: transform .05s ease, background .15s ease, border-color .15s ease;
+      text-align:left; min-width: 220px;
+    }
+    .btn:hover{background: rgba(255,255,255,.045); border-color: rgba(255,255,255,.16)}
+    .btn:active{transform: translateY(1px)}
+    .btn .sub{color:var(--mut); font-size:12px; margin-top:4px}
+
+    .kpi{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+      padding:10px 12px; border:1px solid var(--line); border-radius:12px;
+      background: rgba(255,255,255,.02);
+      min-width: 240px;
+      flex: 1 1 240px;
+    }
+    .kpi .name{color:var(--mut); font-size:12px}
+    .kpi .val{font-size:22px; font-weight:900}
+    .kpi .chg{font-size:12px; font-weight:800}
+    .chg.pos{color:var(--good)}
+    .chg.neg{color:var(--bad)}
+
+    /* ===== TradingView 느낌 히트맵 ===== */
+    .heatmapTV{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: 86px;
+      gap:12px;
+    }
+    @media (max-width: 980px){
+      .heatmapTV{grid-template-columns: repeat(6, 1fr); grid-auto-rows: 90px;}
+    }
+    .tile{
+      position:relative;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px 12px;
+      overflow:hidden;
+      cursor:pointer;
+      user-select:none;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      min-height: 86px;
+    }
+    .tile:hover{border-color: rgba(255,255,255,.18)}
+    .tile::before{
+      content:"";
+      position:absolute; inset:-40px;
+      background: radial-gradient(700px 220px at 18% 0%, rgba(255,255,255,.14), transparent 60%);
+      pointer-events:none;
+      transform: rotate(-5deg);
+    }
+    .tileTop{
+      display:flex; align-items:center; gap:10px; z-index:1;
+    }
+    .logo{
+      width:34px; height:34px; border-radius:50%;
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.10);
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+      flex: 0 0 34px;
+    }
+    .logo img{width:100%; height:100%; object-fit:cover}
+    .symWrap{display:flex; flex-direction:column; gap:2px}
+    .sym{font-weight:950; font-size:13px; letter-spacing:.3px}
+    .name{font-size:11px; color:rgba(233,238,252,.8)}
+    .tileBottom{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:8px; z-index:1;
+    }
+    .price{font-weight:900; font-size:13px}
+    .chg2{font-weight:950; font-size:12px}
+    .chg2.pos{color:var(--good)}
+    .chg2.neg{color:var(--bad)}
+    .chg2.na{color:var(--mut)}
+    .hint{font-size:11px; color:rgba(233,238,252,.75)}
+    .tooltip{
+      position:absolute; left:12px; bottom:12px;
+      background: rgba(10,14,22,.92);
+      border:1px solid rgba(255,255,255,.12);
+      padding:8px 10px;
+      border-radius:12px;
+      font-size:12px;
+      color:var(--txt);
+      display:none;
+      z-index: 5;
+      max-width: 320px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+    .tile:hover .tooltip{display:block}
+
+    .meterWrap{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .meter{
+      width: 280px; height: 10px; border-radius:999px;
+      background: linear-gradient(90deg, #ff4d5a, #ffd166, #15c47e);
+      border: 1px solid var(--line);
+      position:relative; overflow:hidden;
+    }
+    .needle{
+      position:absolute; top:-8px;
+      width:2px; height:26px; background:#e9eefc;
+      box-shadow:0 0 10px rgba(233,238,252,.4);
+      left: 50%;
+    }
+    .fgText{font-weight:950}
+
+    .error{color:#ff9aa2; font-size:12px; white-space:pre-wrap}
+
+    /* ---- Journal (이전 코드 그대로) ---- */
+    .journalGrid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:12px;
+    }
+    @media (max-width: 980px){ .journalGrid{grid-template-columns:1fr} }
+
+    .form{
+      display:flex; flex-direction:column; gap:10px;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background: rgba(255,255,255,.02);
+    }
+    .form label{font-size:12px; color:var(--mut)}
+    .form .field{display:flex; flex-direction:column; gap:6px}
+    input, select, textarea{
+      width:100%;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--txt);
+      padding:10px 10px;
+      outline:none;
+      font-size:13px;
+    }
+    input:focus, select:focus, textarea:focus{border-color: var(--focus)}
+    textarea{min-height:70px; resize:vertical}
+
+    .actions{display:flex; gap:10px; flex-wrap:wrap}
+    .btn2{
+      appearance:none;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      color: var(--txt);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:850;
+      font-size:13px;
+    }
+    .btn2:hover{background: rgba(255,255,255,.045); border-color: rgba(255,255,255,.16)}
+    .btn2.danger{border-color: rgba(255,77,90,.35)}
+    .btn2.danger:hover{background: rgba(255,77,90,.10)}
+
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background: rgba(255,255,255,.02);
+    }
+    thead th{
+      text-align:left;
+      font-size:12px;
+      color:var(--mut);
+      padding:10px;
+      border-bottom:1px solid var(--line);
+      position:sticky;
+      top:0;
+      background: rgba(10,14,22,.92);
+      backdrop-filter: blur(8px);
+      z-index: 1;
+    }
+    tbody td{
+      padding:10px;
+      font-size:12px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      vertical-align:top;
+    }
+    tbody tr:hover{background: rgba(255,255,255,.03)}
+    .tag{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      font-size:11px;
+      color: var(--mut);
+      font-weight:800;
+    }
+    .tag.buy{color: var(--good)}
+    .tag.sell{color: var(--bad)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .right{text-align:right}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <div class="title">Crypto Dashboard (커스텀 코인)</div>
+      <div class="meta" id="last">Last update: -</div>
+    </div>
+    <div class="row">
+      <div class="pill" id="status">loading…</div>
+      <div class="pill">Auto refresh: <b>60s</b></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>
+        <span>관심 코인 히트맵 (6개 고정)</span>
+        <span class="small">마우스오버 → 정보 / 클릭 → TradingView</span>
+      </h3>
+      <div class="body">
+        <div class="heatmapTV" id="heatmap"></div>
+        <div class="error" id="hmErr" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <span>시장 지표</span>
+        <span class="small">F&amp;G + 환율 + KPI</span>
+      </h3>
+      <div class="body">
+        <div class="meterWrap" style="margin-bottom:12px">
+          <div>
+            <div class="small">공포탐욕지수 (Fear &amp; Greed)</div>
+            <div style="display:flex; gap:10px; align-items:baseline; margin-top:4px">
+              <div class="fgText" id="fgVal" style="font-size:26px">-</div>
+              <div class="small" id="fgClass">-</div>
+            </div>
+          </div>
+          <div class="meter">
+            <div class="needle" id="needle" style="left:50%"></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-bottom:12px">
+          <div class="kpi">
+            <div>
+              <div class="name">USD/KRW</div>
+              <div class="small" id="fxSrc">환율 로딩중…</div>
+            </div>
+            <div style="text-align:right">
+              <div class="val" id="fx">-</div>
+              <div class="chg" id="fxchg"></div>
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div>
+              <div class="name">Total Market Cap</div>
+              <div class="small">CoinGecko Global</div>
+            </div>
+            <div style="text-align:right">
+              <div class="val" id="mcap">-</div>
+              <div class="chg" id="mcapchg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="openBTC">
+            <div><b>BTC</b> 차트 열기</div>
+            <div class="sub">TradingView에서 바로 보기</div>
+          </button>
+          <button class="btn" id="openBTCD">
+            <div><b>BTC Dominance</b> 차트 열기</div>
+            <div class="sub">CRYPTOCAP:BTC.D</div>
+          </button>
+          <button class="btn" id="openETH">
+            <div><b>ETH</b> 차트 열기</div>
+            <div class="sub">TradingView에서 바로 보기</div>
+          </button>
+        </div>
+
+        <div class="error" id="kpiErr" style="display:none; margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>
+      <span>코인 매매기록 (브라우저 자동저장)</span>
+      <span class="small">추가/삭제 + CSV 내보내기</span>
+    </h3>
+    <div class="body">
+      <div class="journalGrid">
+        <div class="form">
+          <div class="field">
+            <label>날짜/시간</label>
+            <input id="j_date" type="datetime-local" />
+          </div>
+
+          <div class="row">
+            <div class="field" style="flex:1 1 160px">
+              <label>유형</label>
+              <select id="j_side">
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1 1 160px">
+              <label>코인</label>
+              <select id="j_coin"></select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="flex:1 1 160px">
+              <label>가격 (USD)</label>
+              <input id="j_price" type="number" step="0.00000001" placeholder="예: 68000" />
+            </div>
+            <div class="field" style="flex:1 1 160px">
+              <label>수량</label>
+              <input id="j_qty" type="number" step="0.00000001" placeholder="예: 0.01" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="flex:1 1 160px">
+              <label>수수료 (USD, 선택)</label>
+              <input id="j_fee" type="number" step="0.00000001" placeholder="예: 1.2" />
+            </div>
+            <div class="field" style="flex:1 1 160px">
+              <label>태그 (선택)</label>
+              <input id="j_tag" type="text" placeholder="예: 단타/스윙/장투" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>메모 (선택)</label>
+            <textarea id="j_note" placeholder="진입 근거 / 청산 이유 / 복기..."></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="btn2" id="j_add">기록 추가</button>
+            <button class="btn2 danger" id="j_clear">전체 삭제</button>
+            <button class="btn2" id="j_export">CSV 내보내기</button>
+          </div>
+
+          <div class="small" id="j_hint">
+            저장 위치: 이 브라우저의 localStorage (다른 PC/브라우저로는 자동 동기화 안 됨)
+          </div>
+        </div>
+
+        <div style="overflow:auto; max-height:420px; border-radius:12px">
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:150px">일시</th>
+                <th>유형</th>
+                <th>코인</th>
+                <th class="right">가격(USD)</th>
+                <th class="right">수량</th>
+                <th class="right">총액(USD)</th>
+                <th>태그</th>
+                <th style="min-width:220px">메모</th>
+                <th>삭제</th>
+              </tr>
+            </thead>
+            <tbody id="j_rows"></tbody>
+          </table>
+          <div class="small" style="margin-top:8px" id="j_stats">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ====== 코인 6개 고정 (MATIC 제거) ====== */
+const COINS = [
+  { label:"BTC",  name:"Bitcoin",    cgId:"bitcoin",   tv:"BINANCE:BTCUSDT" },
+  { label:"USDT", name:"Tether",     cgId:"tether",    tv:"CRYPTO:USDTUSD" },
+  { label:"ETH",  name:"Ethereum",   cgId:"ethereum",  tv:"BINANCE:ETHUSDT" },
+  { label:"XRP",  name:"XRP",        cgId:"ripple",    tv:"BINANCE:XRPUSDT" },
+  { label:"TRX",  name:"Tron",       cgId:"tron",      tv:"BINANCE:TRXUSDT" },
+  { label:"SUT",  name:"SuperTrust", cgId:null,        tv:"SUTSUSD" }, // CG 없으면 N/A
+];
+
+const REFRESH_MS = 60_000;
+const LS_KEY = "crypto_journal_v1";
+
+const $ = (id)=>document.getElementById(id);
+
+const fmt = (n, d=2)=> {
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
+  return Number(n).toLocaleString(undefined, {maximumFractionDigits:d});
+};
+
+const money = (n)=> {
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
+  if (n >= 1e12) return (n/1e12).toFixed(2)+"T";
+  if (n >= 1e9)  return (n/1e9).toFixed(2)+"B";
+  if (n >= 1e6)  return (n/1e6).toFixed(2)+"M";
+  return fmt(n, 0);
+};
+
+const pctClass = (p)=> p >= 0 ? "pos" : "neg";
+
+function tvUrl(symbol){
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`;
+}
+function openTV(symbol){
+  window.open(tvUrl(symbol), "_blank", "noopener,noreferrer");
+}
+
+$("openBTC").onclick = ()=> openTV("BINANCE:BTCUSDT");
+$("openETH").onclick = ()=> openTV("BINANCE:ETHUSDT");
+$("openBTCD").onclick = ()=> openTV("CRYPTOCAP:BTC.D");
+
+function setStatus(txt){ $("status").textContent = txt; }
+
+function setError(elId, msg){
+  const el = $(elId);
+  el.style.display = msg ? "block" : "none";
+  el.textContent = msg || "";
+}
+
+function chgText(el, p){
+  el.textContent = (p>=0?"+":"") + fmt(p,2) + "%";
+  el.className = "chg " + pctClass(p);
+}
+
+async function fetchJSON(url, timeoutMs=12000){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+  try{
+    const r = await fetch(url, {signal: ctrl.signal, cache:"no-store"});
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/* ---- FX: USD/KRW (2중 백업) ---- */
+async function fetchUSDKRW(){
+  try{
+    const j = await fetchJSON("https://api.frankfurter.app/latest?from=USD&to=KRW", 12000);
+    const v = j?.rates?.KRW;
+    if (typeof v === "number") return { rate: v, source: "frankfurter.app" };
+  } catch(e){}
+  try{
+    const j = await fetchJSON("https://open.er-api.com/v6/latest/USD", 12000);
+    const v = j?.rates?.KRW;
+    if (typeof v === "number") return { rate: v, source: "open.er-api.com" };
+  } catch(e){}
+  throw new Error("USD/KRW 환율 API 실패");
+}
+
+/* ---- CoinGecko 로고 URL (가능하면 표시) ---- */
+function logoUrlFromCgId(id){
+  // CoinGecko image는 coins/markets 응답에 들어오므로, 거기서 받는 걸 우선.
+  return null;
+}
+
+/* ---- Heatmap (TradingView 느낌) ---- */
+function buildHeatmapTiles(coinDataByCgId, logoByCgId){
+  const hm = $("heatmap");
+  hm.innerHTML = "";
+
+  // 시총으로 타일 크기(span) 결정
+  const caps = [];
+  for (const c of COINS){
+    const d = c.cgId ? coinDataByCgId.get(c.cgId) : null;
+    if (d?.market_cap) caps.push(d.market_cap);
+  }
+  caps.sort((a,b)=>b-a);
+  const maxCap = caps[0] || 1;
+
+  for(const c of COINS){
+    const d = c.cgId ? coinDataByCgId.get(c.cgId) : null;
+
+    const change = (d?.price_change_percentage_24h ?? null);
+    const bg = (typeof change === "number")
+      ? (change >= 0
+          ? `rgba(21,196,126,${Math.min(0.60, 0.18 + Math.abs(change)/20)})`
+          : `rgba(255,77,90,${Math.min(0.60, 0.18 + Math.abs(change)/20)})`)
+      : `rgba(255,255,255,.06)`;
+
+    const cap = d?.market_cap ?? 0;
+    const span = Math.max(3, Math.min(8, Math.round(Math.sqrt(cap/maxCap)*8) || 3));
+
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.style.background = `linear-gradient(180deg, ${bg}, rgba(255,255,255,.02))`;
+    tile.style.gridColumn = `span ${span}`;
+    tile.onclick = ()=> openTV(c.tv);
+
+    const top = document.createElement("div");
+    top.className = "tileTop";
+
+    const logo = document.createElement("div");
+    logo.className = "logo";
+    const imgUrl = c.cgId ? logoByCgId.get(c.cgId) : null;
+    if (imgUrl){
+      const img = document.createElement("img");
+      img.src = imgUrl;
+      img.alt = c.label;
+      logo.appendChild(img);
+    } else {
+      logo.textContent = c.label[0]; // 없으면 첫 글자
+      logo.style.fontWeight = "900";
+      logo.style.color = "rgba(233,238,252,.8)";
+      logo.style.fontSize = "13px";
+    }
+
+    const symWrap = document.createElement("div");
+    symWrap.className = "symWrap";
+    const sym = document.createElement("div");
+    sym.className = "sym";
+    sym.textContent = c.label;
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = c.name;
+
+    symWrap.appendChild(sym);
+    symWrap.appendChild(name);
+
+    top.appendChild(logo);
+    top.appendChild(symWrap);
+
+    const bottom = document.createElement("div");
+    bottom.className = "tileBottom";
+
+    const price = document.createElement("div");
+    price.className = "price";
+    price.textContent = (d?.current_price != null) ? `$${fmt(d.current_price, 6)}` : `N/A`;
+
+    const ch = document.createElement("div");
+    if (typeof change === "number"){
+      ch.className = "chg2 " + pctClass(change);
+      ch.textContent = (change>=0?"+":"") + fmt(change,2) + "%";
+    } else {
+      ch.className = "chg2 na";
+      ch.textContent = "24h: N/A";
+    }
+
+    bottom.appendChild(price);
+    bottom.appendChild(ch);
+
+    const tip = document.createElement("div");
+    tip.className = "tooltip";
+    const mc = d?.market_cap != null ? `$${money(d.market_cap)}` : "N/A";
+    const vol = d?.total_volume != null ? `$${money(d.total_volume)}` : "N/A";
+    tip.innerHTML = `
+      <div style="font-weight:950; margin-bottom:4px">${c.label} (${c.name})</div>
+      <div class="hint">가격: ${d?.current_price!=null ? `$${fmt(d.current_price, 8)}` : "N/A"}</div>
+      <div class="hint">24h: ${typeof change==="number" ? ((change>=0?"+":"")+fmt(change,2)+"%") : "N/A"}</div>
+      <div class="hint">시총: ${mc}</div>
+      <div class="hint">거래량: ${vol}</div>
+      <div class="hint" style="margin-top:6px; opacity:.8">클릭하면 TradingView로 이동</div>
+    `;
+
+    tile.appendChild(top);
+    tile.appendChild(bottom);
+    tile.appendChild(tip);
+    hm.appendChild(tile);
+  }
+}
+
+/* ---- Main updater ---- */
+async function updateAll(){
+  setStatus("loading…");
+  setError("hmErr", "");
+  setError("kpiErr", "");
+
+  const cgIds = COINS.filter(x=>x.cgId).map(x=>x.cgId);
+  const idsParam = cgIds.join(",");
+
+  const coinUrl =
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(idsParam)}&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h`;
+  const globalUrl = `https://api.coingecko.com/api/v3/global`;
+  const fgUrl = `https://api.alternative.me/fng/?limit=1`;
+
+  try{
+    const [coins, global, fg, fx] = await Promise.all([
+      idsParam ? fetchJSON(coinUrl) : Promise.resolve([]),
+      fetchJSON(globalUrl),
+      fetchJSON(fgUrl),
+      fetchUSDKRW(),
+    ]);
+
+    const map = new Map();
+    const logo = new Map();
+    for (const x of (coins || [])){
+      map.set(x.id, x);
+      if (x?.image) logo.set(x.id, x.image);
+    }
+    buildHeatmapTiles(map, logo);
+
+    const mcapUsd = global?.data?.total_market_cap?.usd;
+    const mcapChg = global?.data?.market_cap_change_percentage_24h_usd;
+    $("mcap").textContent = money(mcapUsd);
+    if (typeof mcapChg === "number") chgText($("mcapchg"), mcapChg);
+    else $("mcapchg").textContent = "";
+
+    const v = Number(fg?.data?.[0]?.value);
+    const cls = fg?.data?.[0]?.value_classification || "-";
+    $("fgVal").textContent = Number.isFinite(v) ? String(v) : "-";
+    $("fgClass").textContent = cls;
+    if (Number.isFinite(v)) $("needle").style.left = Math.max(0, Math.min(100, v)) + "%";
+
+    $("fx").textContent = fx?.rate ? fmt(fx.rate, 2) : "-";
+    $("fxSrc").textContent = fx?.source ? `환율 (${fx.source})` : "환율";
+    $("fxchg").textContent = "";
+
+    const now = new Date();
+    $("last").textContent = `Last update: ${now.toLocaleString()}`;
+    setStatus("ok");
+  } catch (e){
+    setStatus("error");
+    buildHeatmapTiles(new Map(), new Map());
+    setError("hmErr", `로딩 실패: ${e.message}\n→ 새로고침(F5) 또는 잠깐 뒤 다시 시도`);
+    setError("kpiErr", `지표 로딩 실패: ${e.message}`);
+  }
+}
+
+/* ---- Journal (이전 기능 그대로) ---- */
+function initJournalCoinSelect(){
+  const sel = $("j_coin");
+  sel.innerHTML = "";
+  for (const c of COINS){
+    const opt = document.createElement("option");
+    opt.value = c.label;
+    opt.textContent = c.label;
+    sel.appendChild(opt);
+  }
+}
+
+function loadJournal(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr;
+  } catch(e){
+    return [];
+  }
+}
+function saveJournal(rows){ localStorage.setItem(LS_KEY, JSON.stringify(rows)); }
+
+function toISODateTimeLocal(d){
+  const pad = (n)=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function calcTotalUSD(row){
+  const price = Number(row.price);
+  const qty   = Number(row.qty);
+  const fee   = Number(row.fee || 0);
+  if (!Number.isFinite(price) || !Number.isFinite(qty)) return null;
+  return price * qty + (Number.isFinite(fee) ? fee : 0);
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function renderJournal(){
+  const rows = loadJournal().sort((a,b)=> (b.ts||0) - (a.ts||0));
+  const tbody = $("j_rows");
+  tbody.innerHTML = "";
+
+  let sumBuy = 0, sumSell = 0, n=0;
+  for (const r of rows){
+    const tr = document.createElement("tr");
+    const dt = new Date(r.ts || 0);
+    const dtStr = isNaN(dt.getTime()) ? "-" : dt.toLocaleString();
+    const total = calcTotalUSD(r);
+    if (r.side === "BUY" && typeof total === "number") sumBuy += total;
+    if (r.side === "SELL" && typeof total === "number") sumSell += total;
+    n++;
+
+    tr.innerHTML = `
+      <td class="mono">${dtStr}</td>
+      <td><span class="tag ${r.side==="BUY"?"buy":"sell"}">${r.side}</span></td>
+      <td class="mono">${r.coin || "-"}</td>
+      <td class="right mono">${r.price!=null && r.price!=="" ? fmt(r.price, 8) : "-"}</td>
+      <td class="right mono">${r.qty!=null && r.qty!=="" ? fmt(r.qty, 8) : "-"}</td>
+      <td class="right mono">${typeof total === "number" ? fmt(total, 2) : "-"}</td>
+      <td>${r.tag ? `<span class="tag">${escapeHtml(r.tag)}</span>` : "-"}</td>
+      <td>${r.note ? escapeHtml(r.note) : "-"}</td>
+      <td><button class="btn2 danger" data-del="${r.id}">삭제</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  tbody.querySelectorAll("button[data-del]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-del");
+      const current = loadJournal().filter(x=>String(x.id)!==String(id));
+      saveJournal(current);
+      renderJournal();
+    });
+  });
+
+  const pnl = (sumSell - sumBuy);
+  $("j_stats").textContent =
+    `총 ${n}건 | BUY 합계: $${fmt(sumBuy,2)} | SELL 합계: $${fmt(sumSell,2)} | (단순)순손익: $${fmt(pnl,2)}  ※ 정확한 포지션/평단/부분청산 계산은 추가 가능`;
+}
+
+function addJournalRow(){
+  const dt = $("j_date").value ? new Date($("j_date").value) : new Date();
+  const row = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+    ts: dt.getTime(),
+    side: $("j_side").value,
+    coin: $("j_coin").value,
+    price: $("j_price").value,
+    qty: $("j_qty").value,
+    fee: $("j_fee").value,
+    tag: $("j_tag").value.trim(),
+    note: $("j_note").value.trim(),
+  };
+  if (!row.price || !row.qty){
+    alert("가격과 수량은 필수입니다.");
+    return;
+  }
+  const rows = loadJournal();
+  rows.push(row);
+  saveJournal(rows);
+
+  $("j_price").value = "";
+  $("j_qty").value = "";
+  $("j_fee").value = "";
+  $("j_tag").value = "";
+  $("j_note").value = "";
+  renderJournal();
+}
+
+function exportCSV(){
+  const rows = loadJournal().sort((a,b)=> (a.ts||0) - (b.ts||0));
+  const header = ["datetime","side","coin","price_usd","qty","fee_usd","total_usd","tag","note"];
+  const lines = [header.join(",")];
+
+  for(const r of rows){
+    const dt = new Date(r.ts||0);
+    const dtStr = isNaN(dt.getTime()) ? "" : dt.toISOString();
+    const total = calcTotalUSD(r);
+    const vals = [
+      dtStr, r.side || "", r.coin || "", r.price || "", r.qty || "", r.fee || "",
+      (typeof total === "number") ? total.toFixed(8) : "",
+      (r.tag||"").replaceAll('"','""'),
+      (r.note||"").replaceAll('"','""'),
+    ].map(v=>{
+      const s = String(v ?? "");
+      if (s.includes(",") || s.includes("\n") || s.includes("\r")) return `"${s}"`;
+      return s;
+    });
+    lines.push(vals.join(","));
+  }
+
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "crypto_journal.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function init(){
+  initJournalCoinSelect();
+  $("j_date").value = toISODateTimeLocal(new Date());
+
+  $("j_add").addEventListener("click", addJournalRow);
+  $("j_clear").addEventListener("click", ()=>{
+    if (!confirm("정말 전체 매매기록을 삭제할까요?")) return;
+    localStorage.removeItem(LS_KEY);
+    renderJournal();
+  });
+  $("j_export").addEventListener("click", exportCSV);
+
+  renderJournal();
+  updateAll();
+  setInterval(updateAll, REFRESH_MS);
+}
+init();
+</script>
+</body>
+</html>
