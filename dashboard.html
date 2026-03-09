@@ -79,7 +79,6 @@
     .cardHint{font-size:12px; color:var(--muted);}
     .cardBd{padding:14px;}
 
-    /* ✅ 타일(두번째 사진) 유지 */
     .tiles{
       display:grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -135,7 +134,6 @@
     .neg{color:var(--bad); font-weight:750;}
     .na{color:var(--muted);}
 
-    /* KPI */
     .row{display:flex; gap:12px; flex-wrap:wrap;}
     .kpi{
       flex:1;
@@ -149,7 +147,23 @@
     .kpi .v{font-size:22px; font-weight:850; margin-top:4px;}
     .kpi .s{font-size:12px; color:var(--muted); margin-top:4px;}
 
-    /* journal */
+    .goalBox{
+      margin-top:12px;
+      background: rgba(0,0,0,.18);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+    }
+    .goalRow{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:end;
+    }
+    @media (max-width: 640px){
+      .goalRow{grid-template-columns:1fr;}
+    }
+
     .journalGrid{display:grid; grid-template-columns: 380px 1fr; gap:14px;}
     @media (max-width: 980px){ .journalGrid{grid-template-columns:1fr;} }
     .formBox{
@@ -219,7 +233,7 @@
   </div>
 
   <div class="grid">
-    <!-- LEFT: ✅ 타일만 -->
+    <!-- LEFT -->
     <div class="card">
       <div class="cardHd">
         <div>
@@ -233,7 +247,7 @@
       </div>
     </div>
 
-    <!-- RIGHT: KPI -->
+    <!-- RIGHT -->
     <div class="card">
       <div class="cardHd">
         <div>
@@ -274,22 +288,56 @@
               <span id="pfPnL" class="na">-</span>
               <span class="tdMuted"> · FIFO</span>
             </div>
+            <div class="s" id="pfValueKRW">-</div>
           </div>
 
           <div class="kpi">
             <div class="k">실현 손익 (Realized)</div>
             <div class="v" id="realizedPnL">-</div>
             <div class="s" id="realizedNote">-</div>
+            <div class="s" id="realizedPnLKRW">-</div>
           </div>
 
           <div class="kpi">
             <div class="k">미실현 손익 (Unrealized)</div>
             <div class="v" id="unrealizedPnL">-</div>
             <div class="s" id="unrealizedNote">-</div>
+            <div class="s" id="unrealizedPnLKRW">-</div>
           </div>
         </div>
 
-        <!-- ✅ SUT 설정 3줄(UI) 전부 삭제된 상태 -->
+        <!-- 목표 수익 설정 -->
+        <div class="goalBox">
+          <div class="cardTitle" style="margin-bottom:8px;">목표 수익 설정</div>
+
+          <div class="goalRow">
+            <div>
+              <label>목표 수익 (USD)</label>
+              <input id="goalProfitUSD" type="number" step="0.01" placeholder="예: 1000" />
+            </div>
+            <div style="display:flex; gap:10px; align-items:end;">
+              <button class="btn ok" id="btnSaveGoal">목표 저장</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <div class="kpi">
+              <div class="k">설정한 목표 수익</div>
+              <div class="v" id="goalDisplayUSD">-</div>
+              <div class="s" id="goalDisplayKRW">-</div>
+            </div>
+
+            <div class="kpi">
+              <div class="k">남은 목표 수익</div>
+              <div class="v" id="goalRemainUSD">-</div>
+              <div class="s" id="goalRemainKRW">-</div>
+            </div>
+          </div>
+
+          <div class="smallNote">
+            남은 목표 수익 = 설정한 목표 수익 - 현재 실현손익(Realized)
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -364,16 +412,19 @@
                   <th>유형</th>
                   <th>코인</th>
                   <th>가격(USD)</th>
+                  <th>가격(KRW)</th>
                   <th>수량</th>
                   <th>총액(USD)</th>
-                  <th>수수료(0.1%)</th>
+                  <th>총액(KRW)</th>
+                  <th>수수료(USD)</th>
+                  <th>수수료(KRW)</th>
                   <th>태그</th>
                   <th>메모</th>
                   <th style="width:64px;">삭제</th>
                 </tr>
                 </thead>
                 <tbody id="tbody">
-                  <tr><td colspan="10" class="tdMuted">기록이 없습니다.</td></tr>
+                  <tr><td colspan="13" class="tdMuted">기록이 없습니다.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -401,6 +452,7 @@ const REFRESH_SECONDS = 60;
 document.getElementById("refreshSec").textContent = REFRESH_SECONDS.toString();
 
 const LS_KEY_TRADES = "cd_trades_v_final_tiles";
+const LS_KEY_GOAL_PROFIT_USD = "cd_goal_profit_usd_v1";
 
 /* =========================
    1) 코인 7개 고정
@@ -412,17 +464,18 @@ const COINS = [
   { sym:"XRP",  name:"XRP",        id:"ripple",    tv:"BINANCE:XRPUSDT" },
   { sym:"TRX",  name:"Tron",       id:"tron",      tv:"BINANCE:TRXUSDT" },
   { sym:"POL",  name:"Polygon",    id:"polygon-ecosystem-token", tv:"BINANCE:POLUSDT" },
-  { sym:"SUT",  name:"SuperTrust", id:"super-trust",        tv:"CRYPTO:SUTSUSD" },
+  { sym:"SUT",  name:"SuperTrust", id:"super-trust", tv:"CRYPTO:SUTSUSD" },
 ];
 
 /* =========================
    2) 상태
 ========================= */
-let market = {};   // sym -> {price, change24h, mcap, logo}
-let fx = null;     // {rate, src}
-let fg = null;     // {value, text}
-let global = null; // {mcap_usd, mcap_change_24h}
-let trades = [];   // list
+let market = {};
+let fx = null;
+let fg = null;
+let global = null;
+let trades = [];
+let goalProfitUSD = 0;
 
 /* =========================
    3) 유틸
@@ -440,6 +493,15 @@ function fmtUSD(x){
 function fmtKRW(x){
   if (x == null || !isFinite(x)) return "-";
   return x.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+}
+function usdToKrw(x){
+  if (x == null || !isFinite(x) || !fx?.rate || !isFinite(fx.rate)) return null;
+  return x * fx.rate;
+}
+function fmtUSDKRWLine(usd){
+  const krw = usdToKrw(usd);
+  if (krw == null) return "₩-";
+  return `₩${fmtKRW(krw)}`;
 }
 function clsPosNeg(x){
   if (x == null || !isFinite(x)) return "na";
@@ -493,7 +555,6 @@ async function fetchCoinGeckoMarkets(){
     };
   }
 
-  // SUT은 CoinGecko에서 안 오니까 값 비워둠(아이콘은 S로 처리)
   if (!market["SUT"]) market["SUT"] = { price:null, change24h:null, mcap:null, logo:null };
 }
 async function fetchCoinGeckoGlobal(){
@@ -540,8 +601,7 @@ async function fetchUSDKRW(){
 }
 
 /* =========================
-   5) 타일 렌더 (두번째 사진)
-   - SUT만 "S" 텍스트 아이콘
+   5) 타일 렌더
 ========================= */
 function renderTiles(){
   const el = document.getElementById("tiles");
@@ -551,6 +611,7 @@ function renderTiles(){
     const x = market[c.sym] || {};
     const price = x.price ?? null;
     const ch = x.change24h ?? null;
+    const priceKRW = usdToKrw(price);
 
     const div = document.createElement("div");
     div.className = "tile";
@@ -574,6 +635,7 @@ function renderTiles(){
       <div class="tileMain">
         <div class="sym">${c.sym}</div>
         <div class="p">${price==null?`가격: <span class="na">N/A</span>`:`$${fmtUSD(price)}`}</div>
+        <div class="cardHint">${priceKRW==null?`₩ N/A`:`₩${fmtKRW(priceKRW)}`}</div>
         <div class="c ${changeCls}">${changeTxt}</div>
       </div>
     `;
@@ -598,8 +660,39 @@ function renderKPIs(){
 }
 
 /* =========================
-   7) 매매일지 + FIFO 손익
-   - 수수료: 거래금액의 0.1% (USD) 고정
+   7) 목표 수익 저장/표시
+========================= */
+function loadGoalProfit(){
+  try{
+    const raw = localStorage.getItem(LS_KEY_GOAL_PROFIT_USD);
+    const v = raw == null ? 0 : Number(raw);
+    goalProfitUSD = isFinite(v) ? v : 0;
+  }catch(e){
+    goalProfitUSD = 0;
+  }
+}
+function saveGoalProfit(v){
+  goalProfitUSD = isFinite(v) ? v : 0;
+  localStorage.setItem(LS_KEY_GOAL_PROFIT_USD, String(goalProfitUSD));
+}
+function renderGoalProfit(realizedTotal = 0){
+  const remain = goalProfitUSD - realizedTotal;
+
+  document.getElementById("goalProfitUSD").value = goalProfitUSD ? goalProfitUSD : "";
+  document.getElementById("goalDisplayUSD").textContent = `$${fmtUSD(goalProfitUSD)}`;
+  document.getElementById("goalDisplayKRW").textContent = fmtUSDKRWLine(goalProfitUSD);
+
+  const remainEl = document.getElementById("goalRemainUSD");
+  remainEl.className = `v ${clsPosNeg(-remain)}`;
+  remainEl.textContent = `$${fmtUSD(remain)}`;
+
+  const remainKrwEl = document.getElementById("goalRemainKRW");
+  remainKrwEl.className = `s ${clsPosNeg(-remain)}`;
+  remainKrwEl.textContent = fmtUSDKRWLine(remain);
+}
+
+/* =========================
+   8) 매매일지 + FIFO 손익
 ========================= */
 function loadTrades(){
   try{
@@ -627,22 +720,29 @@ function delTrade(idx){
 function renderTrades(){
   const tb = document.getElementById("tbody");
   if (!trades.length){
-    tb.innerHTML = `<tr><td colspan="10" class="tdMuted">기록이 없습니다.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="13" class="tdMuted">기록이 없습니다.</td></tr>`;
     return;
   }
   tb.innerHTML = "";
   trades.forEach((t, i)=>{
-    const total = (Number(t.price)||0) * (Number(t.qty)||0);
-    const fee = Number(t.fee)||0;
+    const totalUSD = (Number(t.price)||0) * (Number(t.qty)||0);
+    const totalKRW = usdToKrw(totalUSD);
+    const priceKRW = usdToKrw(Number(t.price)||0);
+    const feeUSD = Number(t.fee)||0;
+    const feeKRW = usdToKrw(feeUSD);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="tdMuted">${tsLabel(t.time)}</td>
       <td><b>${t.side}</b></td>
       <td><b>${t.coin}</b></td>
       <td>$${fmtUSD(Number(t.price)||0)}</td>
+      <td>${priceKRW==null?'-':`₩${fmtKRW(priceKRW)}`}</td>
       <td>${fmtUSD(Number(t.qty)||0)}</td>
-      <td>$${fmtUSD(total)}</td>
-      <td class="tdMuted">$${fmtUSD(fee)}</td>
+      <td>$${fmtUSD(totalUSD)}</td>
+      <td>${totalKRW==null?'-':`₩${fmtKRW(totalKRW)}`}</td>
+      <td class="tdMuted">$${fmtUSD(feeUSD)}</td>
+      <td class="tdMuted">${feeKRW==null?'-':`₩${fmtKRW(feeKRW)}`}</td>
       <td class="tdMuted">${t.tag || "-"}</td>
       <td class="tdMuted">${t.memo || "-"}</td>
       <td><button class="xBtn" data-i="${i}">X</button></td>
@@ -749,6 +849,10 @@ function updatePortfolio(){
   document.getElementById("realizedPnL").textContent = (realizedTotal>=0?"+":"") + "$" + fmtUSD(realizedTotal);
   document.getElementById("unrealizedPnL").textContent = (unrealized>=0?"+":"") + "$" + fmtUSD(unrealized);
 
+  document.getElementById("pfValueKRW").textContent = fmtUSDKRWLine(value);
+  document.getElementById("realizedPnLKRW").textContent = fmtUSDKRWLine(realizedTotal);
+  document.getElementById("unrealizedPnLKRW").textContent = fmtUSDKRWLine(unrealized);
+
   const pfPnL = document.getElementById("pfPnL");
   pfPnL.className = clsPosNeg(totalPnL);
   pfPnL.textContent = `총 손익: ${(totalPnL>=0?"+":"")}$${fmtUSD(totalPnL)}`;
@@ -756,7 +860,8 @@ function updatePortfolio(){
   document.getElementById("realizedNote").textContent = "SELL 기준 실현손익(FIFO)";
   document.getElementById("unrealizedNote").textContent = "현재가 기준 미실현손익";
 
-  // chart: cumulative realized
+  renderGoalProfit(realizedTotal);
+
   const labels = [];
   const pnlSeries = [];
   let cumReal = 0;
@@ -803,7 +908,7 @@ function updatePortfolio(){
 }
 
 /* =========================
-   8) CSV Export
+   9) CSV Export
 ========================= */
 function exportCSV(){
   const header = ["time","side","coin","price_usd","qty","fee_usd(0.1%)","tag","memo"];
@@ -830,7 +935,7 @@ function exportCSV(){
 }
 
 /* =========================
-   9) Refresh
+   10) Refresh
 ========================= */
 async function refreshAll(){
   try{
@@ -862,12 +967,11 @@ function startAutoRefresh(){
 }
 
 /* =========================
-   10) Init
+   11) Init
 ========================= */
 function initForm(){
   document.getElementById("fTime").value = nowLocalDatetimeValue();
 
-  // trade coin selector
   const sel = document.getElementById("fCoin");
   sel.innerHTML = "";
   for (const c of COINS){
@@ -891,7 +995,6 @@ function initForm(){
     if (!isFinite(price) || price <= 0) return alert("가격(USD) 제대로");
     if (!isFinite(qty) || qty <= 0) return alert("수량 제대로");
 
-    // ✅ 수수료 고정: 거래금액의 0.1%
     const fee = price * qty * 0.001;
 
     addTrade({ time, side, coin, price, qty, fee, tag, memo });
@@ -920,12 +1023,21 @@ function initForm(){
   };
 
   document.getElementById("btnRefresh").onclick = refreshAll;
+
+  document.getElementById("btnSaveGoal").onclick = ()=>{
+    const v = Number(document.getElementById("goalProfitUSD").value);
+    if (!isFinite(v) || v < 0) return alert("목표 수익(USD)을 0 이상으로 입력해줘");
+    saveGoalProfit(v);
+    updatePortfolio();
+  };
 }
 
 (function boot(){
   initForm();
+  loadGoalProfit();
   loadTrades();
   renderTrades();
+  renderGoalProfit(0);
   refreshAll();
   startAutoRefresh();
 })();
